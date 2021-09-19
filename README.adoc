@@ -1,0 +1,73 @@
+= Kubernetes Secrets 101
+:author: Hafid Haddouti
+:toc: macro
+:toclevels: 4
+:sectlinks:
+:sectanchors:
+
+toc::[]
+
+== Overview
+
+tbd
+
+.Tasks
+* Create a service ID
+* ...assign permmissions to the new service ID to interact with the Secrets Manager instance
+* ...create an API Key for the service ID
+* Prepare Kubernetes-External-Secrets installation
+** get the user-specific Secrets Manager instance endpoint
+** create a link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-secret-groups[secret group] (here `sg-demo`) and probably also some secrets
+** create Kubernetes `Secret` with the generated API Key
+** Install Kubernetes-External-Secrets via Helm3 and setting correct parameters
+
+.Summary of the commands
+----
+# create Service ID and API Key
+$ export SERVICE_ID=`ibmcloud iam service-id-create kubernetes-secrets-tutorial --description "A service ID for testing Secrets Manager and Kubernetes Service." --output json | jq -r ".id"`; echo $SERVICE_ID
+$ ibmcloud iam service-policy-create $SERVICE_ID --roles "SecretsReader" --service-name secrets-manager
+$ export IBM_CLOUD_API_KEY=`ibmcloud iam service-api-key-create kubernetes-secrets-tutorial $SERVICE_ID --description "An API key for testing Secrets Manager." --output json | jq -r ".apikey"`
+
+# Prepare Secrets Manager with secret group and dummy secret
+$ export SECRETS_MANAGER_URL=`ibmcloud resource service-instance my-secrets-manager --output json | jq -r '.[].dashboard_url | .[0:-3]'`; echo $SECRETS_MANAGER_URL
+
+$ export SECRET_GROUP_ID=`ibmcloud secrets-manager secret-group-create --resources '[{"name":"sg-demo","description":"Demo App and Secrets."}]' --output json | jq -r ".resources[].id"`; echo $SECRET_GROUP_ID
+
+$ export SECRET_ID=`ibmcloud secrets-manager secret-create --secret-type username_password  --resources '[{"name":"example_username_password","description":"Extended description for my secret.","secret_group_id":"'"$SECRET_GROUP_ID"'","username":"user123","password":"cloudy-rainy-coffee-book","labels":["env-demo","demo"]}]' --output json | jq -r ".resources[].id"`; echo $SECRET_ID
+
+# Create Secret with API Key, URL and type
+$ kubectl -n default create secret generic secret-api-key --from-literal=apikey=$IBM_CLOUD_API_KEY
+
+$ kubectl -n default create secret generic ibmcloud-credentials --from-literal=apikey=$IBM_CLOUD_API_KEY \
+--from-literal=endpoint=$SECRETS_MANAGER_URL \
+--from-literal=authtype=iam
+
+
+# Install Kubernetes-External-Secrets
+$ helm3 repo add external-secrets https://external-secrets.github.io/kubernetes-external-secrets/
+$ helm3 install kubernetes-external-secrets external-secrets/kubernetes-external-secrets -f kes-ibm-cloud-sm-values.yaml
+
+----
+
+.References
+* link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-tutorial-kubernetes-secrets[IBM Cloud Secrets Manager - Kubernetes integration]
+* link:https://learn.hashicorp.com/tutorials/vault/kubernetes-external-vault?in=vault/kubernetes[Vault install - external vault, agent in cluster]
+* link:https://github.com/external-secrets/kubernetes-external-secrets[GitHub: kubernetes-external-secrets]
+== Summmary
+
+tbd
+
+== References
+
+* tbd
+
+== License
+
+This article and project are licensed under the Apache License, Version 2.
+Separate third-party code objects invoked within this code pattern are licensed by their respective providers pursuant
+to their own separate licenses. Contributions are subject to the
+link:https://developercertificate.org/[Developer Certificate of Origin, Version 1.1] and the
+link:https://www.apache.org/licenses/LICENSE-2.0.txt[Apache License, Version 2].
+
+See also link:https://www.apache.org/foundation/license-faq.html#WhatDoesItMEAN[Apache License FAQ]
+.

@@ -1,0 +1,63 @@
+# Base Deployment 
+# Deploys the following containers
+# - init container: with a dummy echo statement
+# - base container: named "showcase", executes a script, stored in ConfigMap and appends some logs
+# - sidecar container: named "showcase-sidecar", tail/follows the log file 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: showcase-scripts
+data:
+  add.sh: |
+    echo "add.sh script"
+    while [ true ]; do
+      
+      echo "$(date '+%Y-%m-%d %H:%M:%S'): [From Main container] ...waiting..." >> /logs/test.log; 
+
+      echo "[Main container] ...waiting..."
+      sleep 15
+    done;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: showcase-deployment
+  labels:
+    app: showcase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: showcase
+  template:
+    metadata:
+      labels:
+        app: showcase
+    spec:
+      initContainers:
+      - name: init-showcase
+        image: busybox:1.28
+        command: ['sh', '-c', 'echo "InitContainer started...";']
+      containers:
+      - name: showcase
+        image: busybox:1.28
+        command: ['sh', '-c', '/scripts/add.sh']
+        volumeMounts:
+          - name: logs
+            mountPath: /logs
+          - name: showcase-scripts-configmap
+            mountPath: /scripts
+      - name: showcase-sidecar
+        image: alpine:3.12
+        command: ['sh', '-c', 'tail -f /logs/test.log']       
+        volumeMounts:
+          - name: logs
+            mountPath: /logs
+            readOnly: true
+      volumes:
+        - name: logs
+          emptyDir: {}
+        - name: showcase-scripts-configmap
+          configMap:
+            name: showcase-scripts
+            defaultMode: 0777
