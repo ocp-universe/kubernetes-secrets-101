@@ -27,8 +27,10 @@ echo "Secret..."
 export SECRET_ID=`ibmcloud secrets-manager secret-create --secret-type username_password  --resources '[{"name":"example_username_password","description":"Extended description for my secret.","secret_group_id":"'"$SECRET_GROUP_ID"'","username":"user123","password":"cloudy-rainy-coffee-book","labels":["env-demo","demo"]}]' --output json | jq -r ".resources[].id"`; echo "SecretId: $SECRET_ID"
 
 # Create Secret with API Key, URL and type
+kubectl -n default delete secret secret-api-key
 kubectl -n default create secret generic secret-api-key --from-literal=apikey=$IBM_CLOUD_API_KEY
 
+kubectl -n default delete secret ibmcloud-credentials
 kubectl -n default create secret generic ibmcloud-credentials --from-literal=apikey=$IBM_CLOUD_API_KEY \
 --from-literal=endpoint=$SECRETS_MANAGER_URL \
 --from-literal=authtype=iam
