@@ -8,14 +8,14 @@
 
 echo "ServiceID..."
 export SERVICE_ID=`ibmcloud iam service-id kubernetes-secrets-demo --output json | jq -r ".[].id"`
-if [ -z "${SERVICE_ID}"]; then
+if [ -z "${SERVICE_ID}" ]; then
     export SERVICE_ID=`ibmcloud iam service-id-create kubernetes-secrets-demo --description "A service ID for testing Secrets Manager and Kubernetes Service." --output json | jq -r ".id"`; echo "ServiceID: $SERVICE_ID"
     ibmcloud iam service-policy-create $SERVICE_ID --roles "SecretsReader" --service-name secrets-manager
 fi
 
 echo "API Key..."
 export IBM_CLOUD_API_KEY=`ibmcloud iam service-api-key kubernetes-secrets-demo $SERVICE_ID --output json | jq -r ".apikey"`
-if [ -z "${IBM_CLOUD_API_KEY}"]; then
+if [ -z "${IBM_CLOUD_API_KEY}" ]; then
     export IBM_CLOUD_API_KEY=`ibmcloud iam service-api-key-create kubernetes-secrets-demo $SERVICE_ID --description "An API key for testing Secrets Manager." --output json | jq -r ".apikey"`
 fi
 
