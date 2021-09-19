@@ -21,6 +21,8 @@ And additional plugins to retrieve and inject secrets into the Kubernetes resour
 link:https://kubernetes.io/docs/concepts/configuration/secret/[`Secret`] is an object in Kubernetes holding sensitive data. However this data is by default not encrypted and any user with right permissions (view `Secret`) can retrieve the details.
 Depending how the `Secret` object is used is an update of the Secret data not visible to the deployment, this is the case for environment variables. If the `Secret` is mounted to the container is any change to the container visible.
 
+TIP: Consider always to use a Kubernetes cluster with encrypted etcd and restrict the access to the cluster with RBAC!
+
 == IBM Cloud Secrets Manager & kubernetes-external-secrets
 
 link:https://cloud.ibm.com/docs/secrets-manager[IBM Cloud Secrets Manager] built on top of the open source HashiCorp Vault solution and provides a managed offering to maintain centralized secrets, secured and protected.
@@ -37,6 +39,7 @@ The scenario show cases the following
 * updating the secret in the Secrets Manager
 * will trigger automatically an update of the `Secret` object
 
+Beforehand a short summary how to install and configure `kubernetes-external-secrets` with IBM Cloud Secrets Manager. For details consult the link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-tutorial-kubernetes-secrets[docu].
 
 .Tasks to install and configure
 * Create a service ID
@@ -48,7 +51,7 @@ The scenario show cases the following
 ** create Kubernetes `Secret` with the generated API Key
 ** Install Kubernetes-External-Secrets via Helm3 and setting correct parameters
 
-Execute the script link:scripts/ibm-cloud-sm-setup.sh[] or check the following listing to prepare and setup kubernetes-external-secrets.
+Execute the script link:scripts/ibm-cloud-sm-setup.sh[] or check the following listing to prepare and setup `kubernetes-external-secrets`.
 
 .Summary of the commands
 [%collapsible]
@@ -80,9 +83,9 @@ $ helm3 install kubernetes-external-secrets external-secrets/kubernetes-external
 ----
 ====
 
-After the installation of `kubernetes-external-secrets` are we ready to walk through the scenario
+After the installation of `kubernetes-external-secrets` are we ready to walk through the scenario.
 
-The `ExternalSecret` holds a reference to secret in the Secrets Manager (via the UUID). The created `Secret` object will hold the same name (here: `externalsecret-demo-creds-01`)
+The `ExternalSecret` establish a reference to a secret in the Secrets Manager (via the UUID). This results into a created `Secret` with the same name (here: `externalsecret-demo-creds-01`)
 
 ----
 $ kubectl apply -f scripts/external-secret.yaml
@@ -93,7 +96,7 @@ data:
   username: YVVzZXIwMw==
 ----
 
-An update of the secret in the Secrets Manager trigger automatically an update of the ``Secret``s object. The existing `scripts/ibm-cloud-sm-update-secret.sh` supports the update and adds current timestamp in the password value.
+An update of the secret in the Secrets Manager triggers automatically an update of the ``Secret``s object. The existing `scripts/ibm-cloud-sm-update-secret.sh` supports the update and adds current timestamp to the password.
 
 ----
 $ ./scripts/ibm-cloud-sm-update-secret.sh
@@ -102,7 +105,7 @@ $ kubectl get secret externalsecret-demo-creds-01 -o json | jq -r .data.password
 mega-important-2021-09-19_14:50:50
 ----
 
-The link:scripts/base.yaml[] resource file contains a deployment with some containers printing out frequently the values of the env variables. 
+The link:scripts/base.yaml[] resource file contains a deployment with some containers printing out frequently the values of the env and mounted variables. 
 
 ----
 $ kubectl apply -f scripts/base.yaml
