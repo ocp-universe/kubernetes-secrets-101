@@ -32,7 +32,12 @@ else
 fi
 
 echo "Secret..."
-export SECRET_ID=`ibmcloud secrets-manager secret-create --secret-type username_password  --resources '[{"name":"demo-creds-01","description":"Demo Credential - 01.","secret_group_id":"'"$SECRET_GROUP_ID"'","username":"aUser03","password":"mega-important-2009-sunny-day","labels":["env:nonprod","stage:demo"]}]' --output json | jq -r ".resources[].id"`; echo "SecretId: $SECRET_ID"
+export SECRET_ID=`ibmcloud secrets-manager secrets --secret-type username_password --output json | jq '.resources[] | select(.name=="demo-creds-01") | .id'`
+if [ -z "${SECRET_ID}" ]; then
+    export SECRET_ID=`ibmcloud secrets-manager secret-create --secret-type username_password  --resources '[{"name":"demo-creds-01","description":"Demo Credential - 01.","secret_group_id":"'"$SECRET_GROUP_ID"'","username":"aUser03","password":"mega-important-2009-sunny-day","labels":["env:nonprod","stage:demo"]}]' --output json | jq -r ".resources[].id"`; echo "SecretId: $SECRET_ID"
+else 
+    echo "...found: SecretId: $SECRET_ID"
+fi
 
 # Create Secret with API Key, URL and type
 kubectl -n default delete secret secret-api-key
