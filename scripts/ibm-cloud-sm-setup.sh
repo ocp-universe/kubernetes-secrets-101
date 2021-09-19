@@ -3,9 +3,10 @@
 # IBM Cloud Secrets Manager preparation and configuration
 #
 # Prepare usage of IBM Cloud Secrets Manager with Kubernetes-External-Secrets
+# - ServiceID, API and Secrets
+# - Installs/Update kubernetes-external-secrets
 
 # create Service ID and API Key
-
 echo "ServiceID..."
 export SERVICE_ID=`ibmcloud iam service-id kubernetes-secrets-demo --output json | jq -r ".[].id"`
 if [ -z "${SERVICE_ID}" ]; then
@@ -26,7 +27,7 @@ echo "SecretGroup..."
 export SECRET_GROUP_ID=`ibmcloud secrets-manager secret-group-create --resources '[{"name":"sg-demo","description":"Demo App and Secrets."}]' --output json | jq -r ".resources[].id"`; echo "SecretGroupId: $SECRET_GROUP_ID"
 
 echo "Secret..."
-export SECRET_ID=`ibmcloud secrets-manager secret-create --secret-type username_password  --resources '[{"name":"example_username_password","description":"Extended description for my secret.","secret_group_id":"'"$SECRET_GROUP_ID"'","username":"user123","password":"cloudy-rainy-coffee-book","labels":["env-demo","demo"]}]' --output json | jq -r ".resources[].id"`; echo "SecretId: $SECRET_ID"
+export SECRET_ID=`ibmcloud secrets-manager secret-create --secret-type username_password  --resources '[{"name":"demo-creds-01","description":"Demo Credential - 01.","secret_group_id":"'"$SECRET_GROUP_ID"'","username":"aUser03","password":"mega-important-2009-sunny-day","labels":["env:nonprod","stage:demo"]}]' --output json | jq -r ".resources[].id"`; echo "SecretId: $SECRET_ID"
 
 # Create Secret with API Key, URL and type
 kubectl -n default delete secret secret-api-key

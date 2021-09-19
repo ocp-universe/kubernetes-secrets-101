@@ -11,6 +11,8 @@ toc::[]
 
 tbd
 
+== IBM Cloud Secrets Manager & kubernetes-external-secrets
+
 .Tasks
 * Create a service ID
 * ...assign permmissions to the new service ID to interact with the Secrets Manager instance
@@ -20,6 +22,8 @@ tbd
 ** create a link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-secret-groups[secret group] (here `sg-demo`) and probably also some secrets
 ** create Kubernetes `Secret` with the generated API Key
 ** Install Kubernetes-External-Secrets via Helm3 and setting correct parameters
+
+Execute the script link:scripts/ibm-cloud-sm-setup.sh[] or check the following listing to prepare and setup kubernetes-external-secrets.
 
 .Summary of the commands
 ----
@@ -46,8 +50,8 @@ $ kubectl -n default create secret generic ibmcloud-credentials --from-literal=a
 # Install Kubernetes-External-Secrets
 $ helm3 repo add external-secrets https://external-secrets.github.io/kubernetes-external-secrets/
 $ helm3 install kubernetes-external-secrets external-secrets/kubernetes-external-secrets -f kes-ibm-cloud-sm-values.yaml
-
 ----
+
 
 .References
 * link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-tutorial-kubernetes-secrets[IBM Cloud Secrets Manager - Kubernetes integration]
