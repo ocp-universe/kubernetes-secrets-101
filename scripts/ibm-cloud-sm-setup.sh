@@ -24,7 +24,12 @@ echo "SecretsManagerUrl..."
 export SECRETS_MANAGER_URL=`ibmcloud resource service-instance secrets-manager --output json | jq -r '.[].dashboard_url | .[0:-3]'`; echo "SecretsManagerUrl: $SECRETS_MANAGER_URL"
 
 echo "SecretGroup..."
-export SECRET_GROUP_ID=`ibmcloud secrets-manager secret-group-create --resources '[{"name":"sg-demo","description":"Demo App and Secrets."}]' --output json | jq -r ".resources[].id"`; echo "SecretGroupId: $SECRET_GROUP_ID"
+export SECRET_GROUP_ID=`ibmcloud secrets-manager secret-groups --output json | jq '.resources[] | select(.name=="sg-demo") | .id'`
+if [ -z "${SECRET_GROUP_ID}" ]; then
+    export SECRET_GROUP_ID=`ibmcloud secrets-manager secret-group-create --resources '[{"name":"sg-demo","description":"Demo App and Secrets."}]' --output json | jq -r ".resources[].id"`; echo "SecretGroupId: $SECRET_GROUP_ID"
+else 
+    echo "...found: SecretGroupId: $SECRET_GROUP_ID"
+fi
 
 echo "Secret..."
 export SECRET_ID=`ibmcloud secrets-manager secret-create --secret-type username_password  --resources '[{"name":"demo-creds-01","description":"Demo Credential - 01.","secret_group_id":"'"$SECRET_GROUP_ID"'","username":"aUser03","password":"mega-important-2009-sunny-day","labels":["env:nonprod","stage:demo"]}]' --output json | jq -r ".resources[].id"`; echo "SecretId: $SECRET_ID"
