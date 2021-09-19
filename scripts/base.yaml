@@ -3,6 +3,10 @@
 # - init container: with a dummy echo statement
 # - base container: named "showcase", executes a script, stored in ConfigMap and appends some logs
 # - sidecar container: named "showcase-sidecar", tail/follows the log file 
+#
+# The app binds a Secret as env variable and file mount. This show cases the circumstance, 
+# that mounted secrets will be updated, env however not
+#
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -15,8 +19,25 @@ data:
       echo "$(date '+%Y-%m-%d %H:%M:%S'): [From Main container] ...waiting..." >> /logs/test.log; 
 
       echo "[Main container] ...waiting..."
+      echo "Mounted:"
+      echo "username=$(cat /secrets/showcase/username)"
+      echo "password=$(cat /secrets/showcase/password)"
+
+      echo "Env:"
+      env | grep SHOWCASE
+
+      echo "-------------------------------------------"
+
       sleep 15
     done;
+--- 
+apiVersion: v1
+kind: Secret
+metadata:
+  name: externalsecret-demo-creds-01
+stringData:
+  username: dummy
+  password: dummy-value   
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -42,11 +63,27 @@ spec:
       - name: showcase
         image: busybox:1.28
         command: ['sh', '-c', '/scripts/add.sh']
+        env:
+        - name: SHOWCASE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: externalsecret-demo-creds-01
+              key: username
+        - name: SHOWCASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: externalsecret-demo-creds-01
+              key: password
         volumeMounts:
+          # Mount for the logs, shared with sidecar
           - name: logs
             mountPath: /logs
+          # Mount from ConfigMap holding a script
           - name: showcase-scripts-configmap
             mountPath: /scripts
+          # Mount for secrets
+          - name: showcase-secrets
+            mountPath: "/secrets/showcase"
       - name: showcase-sidecar
         image: alpine:3.12
         command: ['sh', '-c', 'tail -f /logs/test.log']       
@@ -61,3 +98,7 @@ spec:
           configMap:
             name: showcase-scripts
             defaultMode: 0777
+        - name: showcase-secrets
+          secret:
+            secretName: externalsecret-demo-creds-01
+            defaultMode: 0400
