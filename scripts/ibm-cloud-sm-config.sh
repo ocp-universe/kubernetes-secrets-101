@@ -5,9 +5,17 @@
 # Prepare usage of IBM Cloud Secrets Manager with Kubernetes-External-Secrets
 
 # create Service ID and API Key
-export SERVICE_ID=`ibmcloud iam service-id-create kubernetes-secrets-demo --description "A service ID for testing Secrets Manager and Kubernetes Service." --output json | jq -r ".id"`; echo "ServiceID: $SERVICE_ID"
-ibmcloud iam service-policy-create $SERVICE_ID --roles "SecretsReader" --service-name secrets-manager
-export IBM_CLOUD_API_KEY=`ibmcloud iam service-api-key-create kubernetes-secrets-demo $SERVICE_ID --description "An API key for testing Secrets Manager." --output json | jq -r ".apikey"`
+
+export SERVICE_ID=`ibmcloud iam service-id kubernetes-secrets-demo --output json | jq -r ".id"`
+if [ -z "${SERVICE_ID}"]; then
+    export SERVICE_ID=`ibmcloud iam service-id-create kubernetes-secrets-demo --description "A service ID for testing Secrets Manager and Kubernetes Service." --output json | jq -r ".id"`; echo "ServiceID: $SERVICE_ID"
+    ibmcloud iam service-policy-create $SERVICE_ID --roles "SecretsReader" --service-name secrets-manager
+fi
+
+export IBM_CLOUD_API_KEY=`ibmcloud iam service-api-key kubernetes-secrets-demo $SERVICE_ID --output json | jq -r ".apikey"`
+if [ -z "${IBM_CLOUD_API_KEY}"]; then
+    export IBM_CLOUD_API_KEY=`ibmcloud iam service-api-key-create kubernetes-secrets-demo $SERVICE_ID --description "An API key for testing Secrets Manager." --output json | jq -r ".apikey"`
+fi
 
 # Prepare Secrets Manager with secret group and dummy secret
 export SECRETS_MANAGER_URL=`ibmcloud resource service-instance secrets-manager --output json | jq -r '.[].dashboard_url | .[0:-3]'`; echo "SecretsManagerUrl: $SECRETS_MANAGER_URL"
