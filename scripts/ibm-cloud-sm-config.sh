@@ -11,6 +11,8 @@ export SERVICE_ID=`ibmcloud iam service-id kubernetes-secrets-demo --output json
 if [ -z "${SERVICE_ID}" ]; then
     export SERVICE_ID=`ibmcloud iam service-id-create kubernetes-secrets-demo --description "A service ID for testing Secrets Manager and Kubernetes Service." --output json | jq -r ".id"`; echo "ServiceID: $SERVICE_ID"
     ibmcloud iam service-policy-create $SERVICE_ID --roles "SecretsReader" --service-name secrets-manager
+else 
+    echo "...found: ServiceID: $SERVICE_ID"
 fi
 
 echo "API Key..."
