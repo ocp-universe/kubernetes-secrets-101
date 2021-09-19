@@ -26,4 +26,5 @@ kubectl -n default create secret generic ibmcloud-credentials --from-literal=api
 
 # Install Kubernetes-External-Secrets
 helm3 repo add external-secrets https://external-secrets.github.io/kubernetes-external-secrets/
-helm3 install kubernetes-external-secrets external-secrets/kubernetes-external-secrets -f kes-ibm-cloud-sm-values.yaml -n default
+#helm3 install kubernetes-external-secrets external-secrets/kubernetes-external-secrets -f kes-ibm-cloud-sm-values.yaml -n default
+helm3 upgrade --install kubernetes-external-secrets external-secrets/kubernetes-external-secrets -f kes-ibm-cloud-sm-values.yaml -n default
