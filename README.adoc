@@ -9,9 +9,21 @@ toc::[]
 
 == Overview
 
-tbd
+Collection of guidance and solution how to handle secrets in a Kubernetes environment. From out-of-the-box solutions to additional extensions
+
+* IBM Cloud Secrets Manager, based on HashiCorp Vault
+* HashiCorp Vault self-managed
+
+And additional plugins to retrieve and inject secrets into the Kubernetes resources.
 
 == IBM Cloud Secrets Manager & kubernetes-external-secrets
+
+link:https://cloud.ibm.com/docs/secrets-manager[IBM Cloud Secrets Manager] built on top of the open source HashiCorp Vault solution and provides a managed offering to maintain centralized secrets, secured and protected.
+
+Due the fact, that internally HashiCorp Vault is integrated, most of the existing plugins/agents could use. The simplest way is to use the Vault cli to interact with IBM Cloud Secrets Manager. In this option however the existing https://github.com/external-secrets/kubernetes-external-secrets[kubernetes-external-secrets] plugin will be used to interact with the service.
+With the CRD `ExternalSecret` a relation to a stored secret in IBM Cloud Secrets Manager instance is established. The result is a generated Kubernetes `Secret` with the sensitive data.
+
+
 
 .Tasks
 * Create a service ID
