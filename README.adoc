@@ -129,15 +129,196 @@ As visible in the output, the values in the env variables are still the old one,
 
 With IBM Cloud Secrets Manager exists an offering base on HashiCorp Vault. The `kubernetes-external-secrets` extension allows a very simple integration in Kubernetes. Also updates will be automatically applied. The extensions supports various providers and configuration parameters.
 
-The drawback - fro the security perspective - are
+The drawback - from the security perspective - are
 
 * the secrets are in `Secret` object and could be retrieved if the user has enough permissions to view ``Secret``s in Kubernetes. This circumstance is not new and a strict RBAC should always be part of the solution.
 * Changes in existing `Secret` object are not automatically visible to the container if bound as environment variable. A restart is needed.
 
 === References
+
 * link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-tutorial-kubernetes-secrets[IBM Cloud Secrets Manager - Kubernetes integration]
 * link:https://learn.hashicorp.com/tutorials/vault/kubernetes-external-vault?in=vault/kubernetes[Vault install - external vault, agent in cluster]
 * link:https://github.com/external-secrets/kubernetes-external-secrets[GitHub: kubernetes-external-secrets]
+
+== HashiCorp Vault & Vault agent
+
+In this section we will use the vault agent to inject secrets from a HashiCorp Vault instance.
+In case you have to install a self-managed HashiCorp Vault instance consider the next sub chanter for a brief overview.
+The subsequent chapter will handle the secrets injection mechanism.
+
+=== HashiCorp Vault installation
+
+HashiCorp Vault provides a link:https://www.vaultproject.io/docs/platform/k8s[Helm Chart] for the installation.
+
+Briefly an overview of the main steps for the installation and configuration
+
+----
+$ git clone https://github.com/hashicorp/vault-helm
+
+$ cd vault-helm
+
+$ helm3 upgrade --install hashicorp-vault . \
+ --set "global.openshift=true" \
+ --set "server.dev.enabled=true" \
+ --set "server.logLevel=trace" \
+ --set "injector.metrics.enabled=true" \
+ --set "injector.namespaceSelector.matchLabels.injection=enabled" \
+ --set "injector.logLevel=trace" 
+
+$ oc label namespace test injection=enabled
+namespace/test labeled
+----
+
+or use the link:scripts/vault.values.openshift.yaml[]
+
+----
+$ helm3 upgrade --install hashicorp-vault . -f ../../scripts/vault.values.openshift.yaml
+----
+
+NOTE: *Attention* `server.dev.enabled=true` installs Vault in dev mode, with memory storage - never use this for production. Use Raft or Consul!
+
+Wait for the completion of the deployment and afterwards initialize and unseal Vault (not necessary for dev mode)
+
+----
+$ oc exec -ti hashicorp-vault-0 -- vault operator init
+
+$ oc exec -ti hashicorp-vault-0 -- vault operator unseal
+----
+
+To access the Vault UI expose the UI
+
+----
+$ oc expose svc hashicorp-vault
+route.route.openshift.io/hashicorp-vault exposed
+
+$ oc get routes
+NAME              HOST/PORT                                    PATH     SERVICES          PORT   TERMINATION   WILDCARD
+hashicorp-vault   hashicorp-vault-test......appdomain.cloud             hashicorp-vault   http                 None
+----
+
+After calling the route and use e.g. the root token to access the UI one have the possibility to set secrets
+
+image:static/vault.png[]
+
+=== HashiCorp Vault Agent Sidecar
+
+By default the link:https://www.vaultproject.io/docs/platform/k8s/injector[Vault Agent injector] will be also installed, otherwise use the link:https://www.vaultproject.io/docs/platform/k8s/injector/installation[docu]. Vault Agent injector retrieves secrets from Vault and stores them on a shared volume as file using a custom or default template.
+
+To enable the communication between the agent and Vault instance is it necessary to configure the auth method, like https://www.vaultproject.io/docs/auth/kubernetes#configuration[Kubernetes Auth method]
+
+.Enable and configure Kubernetes Auth method and first role
+----
+$ vault auth enable kubernetes
+Success! Enabled kubernetes auth method at: kubernetes/
+
+$ vault write auth/kubernetes/config \
+  token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443" \
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+  issuer="kubernetes.default.svc"
+Success! Data written to: auth/kubernetes/config
+
+$ vault write auth/kubernetes/role/role-system-a-dev \
+    bound_service_account_names=sa-system-a-dev \
+    bound_service_account_namespaces=test \
+    policies=system-a-dev \
+    ttl=1h
+Success! Data written to: auth/kubernetes/role/role-system-a-dev
+
+$ vault write auth/kubernetes/role/role-system-b-dev \
+    bound_service_account_names=sa-system-b-dev \
+    bound_service_account_namespaces=test \
+    policies=system-b-dev \
+    ttl=1h
+Success! Data written to: auth/kubernetes/role/role-system-b-dev
+----
+
+Now k8s auth method is enabled and the first role with the following configuration 
+
+* bound to a service account `sa-system-a-dev`
+* ...and a namespace `test`
+* ...and to a Vault policy named `system-a-dev`
+
+Create the policy via the UI (Policies > Create ACL policies)
+
+.`system-a-dev` policy
+----
+path "secret/data/dev/system-a" {  
+  capabilities = ["list", "read"]
+}
+----
+
+.`system-b-dev` policy
+----
+path "secret/data/dev/system-b" {  
+  capabilities = ["list", "read"]
+}
+----
+
+=== Action
+
+After the previous installation and configuration of the agent injector, let's see this in action.
+
+The link:scripts/base-vault.yaml[] contains some resources for the example.
+
+* Deployment with annotation to retrieve secrets from Vault
+* Vault Agent injector use this meta information to interact with Vault
+* retrieves the secrets and stores them on a shared volume, mounted into the container/POD
+* the application uses the file with the secret on the shared volume to set env variables (via `source`) and prints them out in a loop
+
+.Deploy app and all relevant resources
+----
+
+$ oc apply -f scripts/base-vault-init.yaml
+serviceaccount/sa-system-a-dev created
+serviceaccount/sa-system-b-dev created
+
+$ oc apply -f scripts/base-vault.yaml
+
+secret/vault-demo-creds-01 created
+configmap/showcase-scripts created
+deployment.apps/showcase-vault-deployment created
+----
+
+.Verify the logs and created files with secrets from Vault
+----
+$ oc logs -f showcase-vault-deployment-6f4bccd8dd-z9phr -c showcase-vault
+
+[Main container] ...waiting...
+Env:
+...sourcing env-file with content from Vault...
+db_password=SystemA.DB-Password.Dev
+db_userid=SystemA.DB-User.Dev
+
+
+$ oc exec -ti showcase-vault-deployment-6f4bccd8dd-z9phr -- /bin/sh
+ls -l /vault/secrets/
+total 8
+-rw-r--r--    1 10008800 10008800        92 Oct 11 09:30 db-env
+-rw-r--r--    1 10008800 10008800        24 Oct 11 09:30 db.cfg
+
+cat /vault/secrets/db.cfg
+SystemA.DB-User.Dev
+----
+
+Vault Agent link:https://www.vaultproject.io/docs/agent/template#renewals-and-updating-secrets[renews] the secrets regularly (by default all 5mins). This means, changes of a secret in Vault will be visible in the container - correctly in the file on the shared volume - after a short period, without the need to restart the container.
+
+The role in the annotation `vault.hashicorp.com/role` has to match the correct role which is linked to the policy which allows the access of the desired secrets. E.g. if the secrets `dev/system-b` are not under the policy and corresponding role, any access will not be successful and a deployment will fail. Use for this example the configuration in link:scripts/base-vault-fail.yaml[]
+
+Another example link:scripts/base-vault-systemb.yaml[] contains the deployment and configuration to access the `dev/system-b` secrets.
+
+=== Summary
+
+This chapters covered the direct secret injection with the HashiCorp Vault Agent injector. This is, after the mandatory configuration very straight forward in the usage, with the Kubernetes annotations to define and configure which secrets are wanted.
+One of the main draw-back is that the secrets are stored as file on a shared volume. A direct provisioning as environment variable is not possible. Also the creation of Kubernetes `Secret` is not possible.
+
+With this is the HashiCorp Vault Agent injector a good, but lightweight solution to inject secrets. Other injection solutions provides more advanced features.
+
+=== References
+
+* link:https://www.vaultproject.io/docs/platform/k8s/helm/openshift[HashiCorp Vault: OpenShift Installation]
+* link:https://www.vaultproject.io/docs/agent/template#renewals-and-updating-secrets[Vault Agent Secret Renewal]
+
 
 == Summmary
 

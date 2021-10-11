@@ -1,0 +1,45 @@
+# These overrides are appropriate defaults for deploying this chart on OpenShift
+
+global:
+  openshift: true
+  tlsDisable: true
+
+injector:
+  image:
+    repository: "registry.connect.redhat.com/hashicorp/vault-k8s"
+    tag: "0.13.1-ubi"
+
+  agentImage:
+    repository: "registry.connect.redhat.com/hashicorp/vault"
+    tag: "1.8.3-ubi"
+
+  # Configures the log verbosity of the injector.
+  # Supported log levels include: trace, debug, info, warn, error
+  logLevel: "trace"
+
+  # If true, will enable a node exporter metrics endpoint at /metrics.
+  metrics:
+    enabled: true
+
+server:
+  image:
+    repository: "registry.connect.redhat.com/hashicorp/vault"
+    tag: "1.8.3-ubi"
+
+  # Configure the logging verbosity for the Vault server.
+  # Supported log levels include: trace, debug, info, warn, error
+  logLevel: "trace"
+
+  # OpenShift only - create a route to expose the service
+  # The created route will be of type passthrough
+  route:
+    enabled: true
+    host: ""
+
+  # Run Vault in "dev" mode. This requires no further setup, no state management,
+  # and no initialization. This is useful for experimenting with Vault without
+  # needing to unseal, store keys, et. al. All data is lost on restart - do not
+  # use dev mode for anything other than experimenting.
+  # See https://www.vaultproject.io/docs/concepts/dev-server.html to know more
+  dev:
+    enabled: true

@@ -1,0 +1,50 @@
+# Base Deployment for HashiCorp Vault example
+# Deploys the following containers
+# - init container: with a dummy echo statement
+# - base container: named "showcase", executes a script, stored in ConfigMap and appends some logs
+# - sidecar container: named "showcase-sidecar", tail/follows the log file 
+#
+# The app binds a Secret as env variable and file mount. This show cases the circumstance, 
+# that mounted secrets will be updated, env however not
+#
+# Difference to HashiCorp Vault specifica
+# - Using annotation to inject the secrets directly from Vault
+# - using service accounts to interact with Vault, service account is bound to a Vault role and policy
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa-system-a-dev
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa-system-b-dev
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: sa-system-a-dev-role-tokenreview-binding
+#  namespace: test
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: sa-system-a-dev
+    namespace: test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: sa-system-a-dev-privileged-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+- kind: ServiceAccount
+  name: sa-system-a-dev
+  namespace: test
+---

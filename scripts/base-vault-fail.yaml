@@ -1,0 +1,120 @@
+# Base Deployment for HashiCorp Vault example, negativ example!
+# The requested secrets are not in the allowed secrets. Deployment will NOT work!
+#
+# Deploys the following containers
+# - init container: with a dummy echo statement
+# - base container: named "showcase", executes a script, stored in ConfigMap and appends some logs
+# - sidecar container: named "showcase-sidecar", tail/follows the log file 
+#
+# The app binds a Secret as env variable and file mount. This show cases the circumstance, 
+# that mounted secrets will be updated, env however not
+#
+# Difference to HashiCorp Vault specifica
+# - Using annotation to inject the secrets directly from Vault
+# - using service accounts to interact with Vault, service account is bound to a Vault role and policy
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-demo-creds-01
+stringData:
+  username: dummy
+  password: dummy-value 
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: showcase-vault-scripts
+data:
+  add.sh: |
+    echo "add.sh script"
+    while [ true ]; do
+      
+      echo "$(date '+%Y-%m-%d %H:%M:%S'): [From Main container] ...waiting..." >> /logs/test.log; 
+
+      echo "[Main container] ...waiting..."
+      
+      #echo "Mounted:"
+      #echo "username=$(cat /secrets/showcase/username)"
+      #echo "password=$(cat /secrets/showcase/password)"
+
+      echo "Env:"
+      echo "...sourcing env-file (system-a) with content from Vault..."
+      source /vault/secrets/db-env
+      echo "...sourcing env-file (system-b) with content from Vault..."
+      source /vault/secrets/db2-env
+      env | grep -i db
+
+      echo "-------------------------------------------"
+
+      sleep 15
+    done;  
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: showcase-vault-deployment
+  labels:
+    app: showcase-vault
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: showcase-vault
+  template:
+    metadata:
+      labels:
+        app: showcase-vault
+      annotations:        
+        # Enable Vault Agent Injection
+        vault.hashicorp.com/agent-inject: "true"        
+        vault.hashicorp.com/agent-inject-status: "update"   
+        # The secrets will be mounted as volumes with path /vault/secrets/...     
+        #vault.hashicorp.com/agent-inject-secret-db-id: "system-a/dev/db_userid"        
+        #vault.hashicorp.com/agent-inject-secret-db-pw: "system-a/dev/db_password"        
+        # Inject the Vault secret into a file '/vault/secrets/db.cfg'
+        vault.hashicorp.com/agent-inject-secret-db.cfg: "secret/dev/system-a"   
+        vault.hashicorp.com/agent-inject-template-db.cfg: |          
+          {{- with secret "secret/dev/system-a" -}}
+          {{ .Data.data.db_userid }}
+          {{- end }}    
+        # Create a file to be sourced, which sets env variables
+        vault.hashicorp.com/agent-inject-secret-db-env: "secret/dev/system-a"   
+        vault.hashicorp.com/agent-inject-template-db-env: |          
+          {{- with secret "secret/dev/system-a" -}}
+          {{ range $k, $v := .Data.data }}
+          export {{ $k }}="{{ $v }}"
+          {{ end }}     
+          {{- end }}     
+        # Create a file to be sourced, which sets env variables
+        # ############ PROBLEMATIC references ########
+        # secret path is not allowed for the defined role
+        vault.hashicorp.com/agent-inject-secret-db2-env: "secret/dev/system-b"   
+        vault.hashicorp.com/agent-inject-template-db2-env: |          
+          {{- with secret "secret/dev/system-b" -}}
+          {{ range $k, $v := .Data.data }}
+          export {{ $k }}="{{ $v }}"
+          {{ end }}     
+          {{- end }}     
+        vault.hashicorp.com/role: "role-system-a-dev"
+    spec:
+      # Specific sa, relevant for Vault interaction
+      serviceAccountName: sa-system-a-dev
+      containers:
+      - name: showcase-vault
+        image: busybox:1.28
+        command: ['sh', '-c', '/scripts/add.sh']
+        volumeMounts:
+          # Mount for the logs, shared with sidecar
+          - name: logs
+            mountPath: /logs
+          # Mount from ConfigMap holding a script
+          - name: showcase-scripts-configmap
+            mountPath: /scripts
+      volumes:
+        - name: logs
+          emptyDir: {}
+        - name: showcase-scripts-configmap
+          configMap:
+            name: showcase-vault-scripts
+            defaultMode: 0777
+        
