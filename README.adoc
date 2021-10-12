@@ -105,10 +105,10 @@ $ kubectl get secret externalsecret-demo-creds-01 -o json | jq -r .data.password
 mega-important-2021-09-19_14:50:50
 ----
 
-The link:scripts/base.yaml[] resource file contains a deployment with some containers printing out frequently the values of the env and mounted variables. 
+The link:examples/externalsecret-base.yaml[] resource file contains a deployment with some containers printing out frequently the values of the env and mounted variables. 
 
 ----
-$ kubectl apply -f scripts/base.yaml
+$ kubectl apply -f examples/externalsecret-base.yaml
 
 $ kubectl logs -f -l app=showcase
 ...
@@ -214,13 +214,12 @@ Success! Enabled kubernetes auth method at: kubernetes/
 $ vault write auth/kubernetes/config \
   token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
   kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443" \
-  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-  issuer="kubernetes.default.svc"
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 Success! Data written to: auth/kubernetes/config
 
 $ vault write auth/kubernetes/role/role-system-a-dev \
     bound_service_account_names=sa-system-a-dev \
-    bound_service_account_namespaces=test \
+    bound_service_account_namespaces=test,test-vault \
     policies=system-a-dev \
     ttl=1h
 Success! Data written to: auth/kubernetes/role/role-system-a-dev
@@ -259,7 +258,7 @@ path "secret/data/dev/system-b" {
 
 After the previous installation and configuration of the agent injector, let's see this in action.
 
-The link:scripts/base-vault.yaml[] contains some resources for the example.
+The link:examples/vault-agent-base.yaml[] contains some resources for the example.
 
 * Deployment with annotation to retrieve secrets from Vault
 * Vault Agent injector use this meta information to interact with Vault
@@ -269,11 +268,11 @@ The link:scripts/base-vault.yaml[] contains some resources for the example.
 .Deploy app and all relevant resources
 ----
 
-$ oc apply -f scripts/base-vault-init.yaml
+$ oc apply -f examples/vault-agent-init.yaml
 serviceaccount/sa-system-a-dev created
 serviceaccount/sa-system-b-dev created
 
-$ oc apply -f scripts/base-vault.yaml
+$ oc apply -f examples/vault-agent-base.yaml
 
 secret/vault-demo-creds-01 created
 configmap/showcase-scripts created
@@ -303,9 +302,9 @@ SystemA.DB-User.Dev
 
 Vault Agent link:https://www.vaultproject.io/docs/agent/template#renewals-and-updating-secrets[renews] the secrets regularly (by default all 5mins). This means, changes of a secret in Vault will be visible in the container - correctly in the file on the shared volume - after a short period, without the need to restart the container.
 
-The role in the annotation `vault.hashicorp.com/role` has to match the correct role which is linked to the policy which allows the access of the desired secrets. E.g. if the secrets `dev/system-b` are not under the policy and corresponding role, any access will not be successful and a deployment will fail. Use for this example the configuration in link:scripts/base-vault-fail.yaml[]
+The role in the annotation `vault.hashicorp.com/role` has to match the correct role which is linked to the policy which allows the access of the desired secrets. E.g. if the secrets `dev/system-b` are not under the policy and corresponding role, any access will not be successful and a deployment will fail. Use for this example the configuration in link:examples/vault-agent-fail.yaml[]
 
-Another example link:scripts/base-vault-systemb.yaml[] contains the deployment and configuration to access the `dev/system-b` secrets.
+Another example link:examples/vault-agent-systemb.yaml[] contains the deployment and configuration to access the `dev/system-b` secrets.
 
 === Summary
 
@@ -318,6 +317,119 @@ With this is the HashiCorp Vault Agent injector a good, but lightweight solution
 
 * link:https://www.vaultproject.io/docs/platform/k8s/helm/openshift[HashiCorp Vault: OpenShift Installation]
 * link:https://www.vaultproject.io/docs/agent/template#renewals-and-updating-secrets[Vault Agent Secret Renewal]
+
+== HashiCorp Vault & Banzai Cloud bank-vault Mutating Webhook
+
+This scenario use the link:https://banzaicloud.com/docs/bank-vaults/mutating-webhook/[Mutating Webhook] from the vault tool suite link:https://banzaicloud.com/docs/bank-vaults/overview/[bank-vault] from Banzai Cloud.
+The difference of this solution is that it never stores the sensitive data and keeps everything in memory. Additionally it supports the injection of secrets into `ConfigMap` and `Secret` resources.
+
+=== HashiCorp Vault installation
+
+see the previous section how to install HashiCorp Vault.
+
+=== Mutating Webhook installation
+
+The installation use a link:https://github.com/banzaicloud/bank-vaults/tree/master/charts/vault-secrets-webhook[Helm Chart] and explained in the link:https://banzaicloud.com/docs/bank-vaults/mutating-webhook/deploy/[deployment page]. The main steps are summarized here
+
+----
+$ oc new-project test-vault
+$ oc label namespace test-vault webhookinjection=enabled
+namespace/test-vault labeled
+
+$ git clone https://github.com/banzaicloud/bank-vaults.git
+
+$ cd bank-vaults/charts/vault-secrets-webhook
+
+
+$ helm3 upgrade --install banzai-vault-webhook . \
+ -f scripts/webhook.vaules.openshift.yaml
+
+----
+
+In case the runtime is OpenShift does the applications needs some security adjustments for the service account `banzai-vault-webhook-vault-secrets-webhook`
+
+----
+$ oc adm policy add-scc-to-user anyuid -z banzai-vault-webhook-vault-secrets-webhook
+$ oc adm policy add-scc-to-user privileged -z banzai-vault-webhook-vault-secrets-webhook
+----
+
+Check if the 2 pods are up and running
+
+----
+$ oc get pods
+NAME                                                          READY   STATUS    RESTARTS   AGE
+banzai-vault-webhook-vault-secrets-webhook-7d4d7bbdc5-jh5qz   1/1     Running   0          26s
+banzai-vault-webhook-vault-secrets-webhook-7d4d7bbdc5-w74rk   1/1     Running   0          26s
+----
+
+Now you have the webhook installed.
+
+=== Action
+
+Let's see the secret mutating webhook in action.
+
+Apply the link:examples/vault-webhook-base.yaml[] which deploys the same base application with the relevant annotations.
+
+[source,yaml]
+----
+    annotations:        
+        # the address of the Vault service, default values is https://vault:8200
+        vault.security.banzaicloud.io/vault-addr: "http://hashicorp-vault.test:8200"
+        # the default value is the name of the ServiceAccount the Pod runs in, in case of Secrets and ConfigMaps it is "default"
+        vault.security.banzaicloud.io/vault-role: "role-system-a-dev"
+        vault.security.banzaicloud.io/vault-skip-verify: "true" 
+    spec:
+      # Specific sa, relevant for Vault interaction
+      serviceAccountName: sa-system-a-dev
+      containers:
+      - name: showcase-vault
+        image: busybox:1.28
+        command: ['sh', '-c', '/scripts/add.sh']
+        env:
+        - name: DB_USERID
+          value: vault:secret/data/dev/system-a#db_userid
+        - name: DB_PASSWORD
+          value: vault:secret/data/dev/system-a#db_password
+----
+
+The reference of a secret path is defined as follows `vault:secret/data/dev/system-a#db_userid`.
+The mutating webhook will handle this annotation, determine the secrets and holds them in the memory. Only the original process has the possibility to see the values.
+Due the fact, that the base applications prints out the env variables on STDOUT is the value visible
+
+----
+$ oc logs -f showcase-vault-deployment-854d8c6d48-8wq7h
+time="2021-10-12T19:01:04Z" level=info msg="received new Vault token" addr= app=vault-env path=kubernetes role=role-system-a-dev
+time="2021-10-12T19:01:04Z" level=info msg="initial Vault token arrived" app=vault-env
+time="2021-10-12T19:01:04Z" level=info msg="spawning process: [sh -c /scripts/add.sh]" app=vault-env
+add.sh script
+[Main container] ...waiting...
+Env:
+DB_USERID=SystemA.DB-User.Dev
+DB_PASSWORD=SystemA.DB-Password.Dev2
+-------------------------------------------
+[Main container] ...waiting...
+Env:
+DB_USERID=SystemA.DB-User.Dev
+DB_PASSWORD=SystemA.DB-Password.Dev2
+----
+
+But entering the container and trying to print out the env variables results only the in the meta information
+
+----
+oc exec -ti showcase-vault-deployment-854d8c6d48-8wq7h -- env | grep -i db
+DB_USERID=vault:secret/data/dev/system-a#db_userid
+DB_PASSWORD=vault:secret/data/dev/system-a#db_password
+----
+
+=== Summary
+
+The Banzai secret webhook based on mutating webhooks provides here a more secured solution to retrieve and inject secrets. Due the fact, that the secrets kept in memory and only the new spawned process has the possibility to retrieve the secrets is an additional security barrier.
+Also the capabilities to inject secrets into `ConfigMap` and `Secret` are advantages for this solution.
+
+=== References
+
+* link:https://banzaicloud.com/docs/bank-vaults/mutating-webhook/[Banzai Cloud: Mutating Webhook]
+* link:https://github.com/banzaicloud/bank-vaults/tree/master/charts/vault-secrets-webhook[Helm Chart of webhook]
 
 
 == Summmary

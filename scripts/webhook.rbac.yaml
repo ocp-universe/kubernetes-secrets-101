@@ -1,0 +1,56 @@
+# RBAC for Banzia Cloud Secret Webhook and OpenShift
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: banzia-webhook-manage-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - "*"
+  verbs:
+  - "*"
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: vault-webhook-manage-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: banzia-webhook-manage-role
+subjects:
+  - kind: ServiceAccount
+    name: banzai-vault-webhook-vault-secrets-webhook
+    namespace: test-vault
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: vault-webhook-admin-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+subjects:
+  - kind: ServiceAccount
+    name: banzai-vault-webhook-vault-secrets-webhook
+    namespace: test-vault
