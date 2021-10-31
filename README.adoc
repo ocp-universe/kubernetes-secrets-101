@@ -9,8 +9,6 @@ toc::[]
 
 == Overview
 
-NOTE: In progress
-
 Collection of guidance and solution how to handle secrets in a Kubernetes environment. From out-of-the-box solutions to additional extensions
 
 * IBM Cloud Secrets Manager, based on HashiCorp Vault
@@ -21,7 +19,7 @@ And additional plugins to retrieve and inject secrets into the Kubernetes resour
 link:https://kubernetes.io/docs/concepts/configuration/secret/[`Secret`] is an object in Kubernetes holding sensitive data. However this data is by default not encrypted and any user with right permissions (view `Secret`) can retrieve the details.
 Depending how the `Secret` object is used is an update of the Secret data not visible to the deployment, this is the case for environment variables. If the `Secret` is mounted to the container is any change to the container visible.
 
-TIP: Consider always to use a Kubernetes cluster with encrypted etcd and restrict the access to the cluster with RBAC!
+TIP: Consider always to use a Kubernetes cluster with encrypted etcd and restrict the access to the cluster and namespaces with RBAC!
 
 == IBM Cloud Secrets Manager & kubernetes-external-secrets
 
@@ -487,18 +485,21 @@ Also the capabilities to inject secrets into `ConfigMap` and `Secret` are advant
 Secrets and their handling is a serious topics in any cloud environment. Luckily various solutions options exists to integrate managed secrets into applications running in a Kubernetes environment. Not all here shown options fulfill all requirements and use cases. Thereby the appropriate option must be used for the own context and solution. Below is a comparison of the most important features.
 
 |===
-| Requirement | Vault Agent Injector | Banzai Webhook
+| Requirement | kubernetes-external-secrets | Vault Agent Injector | Banzai Webhook
 
-| Supports k8s auth method | Yes | Yes
-| Supports Vault role | Yes | Yes
-| Supports Vault AppRole | link:https://www.vaultproject.io/docs/platform/k8s/injector/examples#approle-authentication[Yes] | Unclear
-| Supports injection in k8s `ConfigMap` | No | Yes
-| Supports injection in k8s `Secret` | No | Yes
-| Supports exposing environment variable | Not directly, only via template & `source` | Yes
-| Secrets visibility limited | No, any process and user can see content | Yes, only visible to spawned process
-| Secrets accessibility limited by k8s service account | Yes | Yes
-| Secrets accessibility limited by k8s namespace | Yes | Yes
-| Supports recognition of secret changes | Yes | No
+| Supports various secrets manager | Yes, Hashi Corp Vault, AWS Secrets Manager, IBM Cloud Secrets Manager | No | No
+| Supports IAM auth method | Yes | No | No
+| Supports k8s auth method | Yes | Yes | Yes
+| Supports Vault role | Yes | Yes | Yes
+| Supports Vault AppRole | No | link:https://www.vaultproject.io/docs/platform/k8s/injector/examples#approle-authentication[Yes] | Unclear
+| Supports injection in k8s `volume` (as mount) | Yes | Yes | No
+| Supports injection in k8s `ConfigMap` | No | No | Yes
+| Supports injection in k8s `Secret` | Yes | No | Yes
+| Supports exposing environment variable | Not directly, only via `envFrom.secretRef` | Not directly, only via template & `source` | Yes
+| Secrets visibility limited | No, any process and user can see content | No, any process and user can see content | Yes, only visible to spawned process
+| Secrets accessibility limited by k8s service account | Yes | Yes | Yes
+| Secrets accessibility limited by k8s namespace | Yes | Yes | Yes
+| Supports recognition of secret changes | Yes | Yes | No
 
 
 |===
