@@ -484,11 +484,29 @@ Also the capabilities to inject secrets into `ConfigMap` and `Secret` are advant
 
 == Summmary
 
-tbd
+Secrets and their handling is a serious topics in any cloud environment. Luckily various solutions options exists to integrate managed secrets into applications running in a Kubernetes environment. Not all here shown options fulfill all requirements and use cases. Thereby the appropriate option must be used for the own context and solution. Below is a comparison of the most important features.
+
+|===
+| Requirement | Vault Agent Injector | Banzai Webhook
+
+| Supports k8s auth method | Yes | Yes
+| Supports Vault role | Yes | Yes
+| Supports Vault AppRole | link:https://www.vaultproject.io/docs/platform/k8s/injector/examples#approle-authentication[Yes] | Unclear
+| Supports injection in k8s `ConfigMap` | No | Yes
+| Supports injection in k8s `Secret` | No | Yes
+| Supports exposing environment variable | Not directly, only via template & `source` | Yes
+| Secrets visibility limited | No, any process and user can see content | Yes, only visible to spawned process
+| Secrets accessibility limited by k8s service account | Yes | Yes
+| Secrets accessibility limited by k8s namespace | Yes | Yes
+| Supports recognition of secret changes | Yes | No
+
+
+|===
+
 
 == References
 
-* tbd
+n/a - see above in the separate sections.
 
 == License
 
