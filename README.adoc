@@ -150,23 +150,32 @@ The subsequent chapter will handle the secrets injection mechanism.
 
 HashiCorp Vault provides a link:https://www.vaultproject.io/docs/platform/k8s[Helm Chart] for the installation.
 
-Briefly an overview of the main steps for the installation and configuration
+Briefly an overview of the main steps for the installation and configuration. All namespaces with the label `vaultinjection=enabled` will be observed from the Agent Injector.
 
 ----
-$ git clone https://github.com/hashicorp/vault-helm
+$ git clone https://github.com/hashicorp/vault-helm -b v0.17.1 --single-branch
 
 $ cd vault-helm
+
+$ oc new-project vault-backend
 
 $ helm3 upgrade --install hashicorp-vault . \
  --set "global.openshift=true" \
  --set "server.dev.enabled=true" \
  --set "server.logLevel=trace" \
  --set "injector.metrics.enabled=true" \
- --set "injector.namespaceSelector.matchLabels.injection=enabled" \
- --set "injector.logLevel=trace" 
+ --set "injector.namespaceSelector.matchLabels.vaultinjection=enabled" \
+ --set "injector.logLevel=trace" \
+ --namespace vault-backend
 
-$ oc label namespace test injection=enabled
-namespace/test labeled
+$ oc label namespace vault-backend vaultinjection=enabled
+namespace/vault-backend labeled
+
+$ oc label namespace vault-test1 vaultinjection=enabled
+namespace/vault-test1 labeled
+
+$ oc label namespace vault-test2 vaultinjection=enabled
+namespace/vault-test2 labeled
 ----
 
 or use the link:scripts/vault.values.openshift.yaml[]
@@ -196,7 +205,9 @@ NAME              HOST/PORT                                    PATH     SERVICES
 hashicorp-vault   hashicorp-vault-test......appdomain.cloud             hashicorp-vault   http                 None
 ----
 
-After calling the route and use e.g. the root token to access the UI one have the possibility to set secrets
+After calling the route and use e.g. the root token to access the UI one have the possibility to set secrets.
+
+NOTE: The root token in Vault dev mode is printed out in the `hashicorp-vault-0` pod.
 
 image:static/vault.png[]
 
@@ -206,8 +217,10 @@ By default the link:https://www.vaultproject.io/docs/platform/k8s/injector[Vault
 
 To enable the communication between the agent and Vault instance is it necessary to configure the auth method, like https://www.vaultproject.io/docs/auth/kubernetes#configuration[Kubernetes Auth method]
 
-.Enable and configure Kubernetes Auth method and first role
+.Enable and configure Kubernetes Auth method and first roles
 ----
+$ oc exec -ti hashicorp-vault-0 -- /bin/sh
+
 $ vault auth enable kubernetes
 Success! Enabled kubernetes auth method at: kubernetes/
 
@@ -219,24 +232,26 @@ Success! Data written to: auth/kubernetes/config
 
 $ vault write auth/kubernetes/role/role-system-a-dev \
     bound_service_account_names=sa-system-a-dev \
-    bound_service_account_namespaces=test,test-vault \
+    bound_service_account_namespaces=vault-test1,test,vault-test3 \
     policies=system-a-dev \
     ttl=1h
 Success! Data written to: auth/kubernetes/role/role-system-a-dev
 
 $ vault write auth/kubernetes/role/role-system-b-dev \
     bound_service_account_names=sa-system-b-dev \
-    bound_service_account_namespaces=test \
+    bound_service_account_namespaces=vault-test2,test \
     policies=system-b-dev \
     ttl=1h
 Success! Data written to: auth/kubernetes/role/role-system-b-dev
 ----
 
-Now k8s auth method is enabled and the first role with the following configuration 
+Now k8s auth method is enabled and the first roles with the following configuration 
 
-* bound to a service account `sa-system-a-dev`
-* ...and a namespace `test`
-* ...and to a Vault policy named `system-a-dev`
+|===
+| Role | Namespace | Service Account
+| `role-system-a-dev` | `vault-test1`, `vault-test3`, `test` | `sa-system-a-dev`
+| `role-system-b-dev` | `vault-test2`, `test` | `sa-system-b-dev`
+|===
 
 Create the policy via the UI (Policies > Create ACL policies)
 
@@ -254,6 +269,14 @@ path "secret/data/dev/system-b" {
 }
 ----
 
+The following diagrams visualize the made configuration in the Vault UI
+
+.Vault Access: Kubernetes auth method and available roles
+image:static/vault_access_k8s_roles.png[]
+
+.Vault Access: Kubernetes auth method and one role details
+image:static/vault_access_k8s_role_detail.png[]
+
 === Action
 
 After the previous installation and configuration of the agent injector, let's see this in action.
@@ -265,8 +288,19 @@ The link:examples/vault-agent-base.yaml[] contains some resources for the exampl
 * retrieves the secrets and stores them on a shared volume, mounted into the container/POD
 * the application uses the file with the secret on the shared volume to set env variables (via `source`) and prints them out in a loop
 
+Beforehand some secrets are needed. To match the Vault policies e.g. the following secrets are created in `secret/dev/system-a` (respective `secret/dev/system-b`)
+
+[source,json]
+----
+{
+  "db_password": "SystemA.DB-Password.Dev",
+  "db_userid": "SystemA.DB-User.Dev"
+}
+----
+
 .Deploy app and all relevant resources
 ----
+$ oc project vault-test1
 
 $ oc apply -f examples/vault-agent-init.yaml
 serviceaccount/sa-system-a-dev created
@@ -281,7 +315,7 @@ deployment.apps/showcase-vault-deployment created
 
 .Verify the logs and created files with secrets from Vault
 ----
-$ oc logs -f showcase-vault-deployment-6f4bccd8dd-z9phr -c showcase-vault
+$ oc logs -f -l app=showcase-vault --all-containers
 
 [Main container] ...waiting...
 Env:
@@ -304,7 +338,7 @@ Vault Agent link:https://www.vaultproject.io/docs/agent/template#renewals-and-up
 
 The role in the annotation `vault.hashicorp.com/role` has to match the correct role which is linked to the policy which allows the access of the desired secrets. E.g. if the secrets `dev/system-b` are not under the policy and corresponding role, any access will not be successful and a deployment will fail. Use for this example the configuration in link:examples/vault-agent-fail.yaml[]
 
-Another example link:examples/vault-agent-systemb.yaml[] contains the deployment and configuration to access the `dev/system-b` secrets.
+Another example link:examples/vault-agent-systemb.yaml[] contains the deployment and configuration to access the `dev/system-b` secrets, but needs to be deployed in the namespace `vault-test2`.
 
 === Summary
 
@@ -331,22 +365,29 @@ see the previous section how to install HashiCorp Vault.
 
 The installation use a link:https://github.com/banzaicloud/bank-vaults/tree/master/charts/vault-secrets-webhook[Helm Chart] and explained in the link:https://banzaicloud.com/docs/bank-vaults/mutating-webhook/deploy/[deployment page]. The main steps are summarized here
 
+.Commands to install the webhook
 ----
-$ oc new-project test-vault
-$ oc label namespace test-vault webhookinjection=enabled
-namespace/test-vault labeled
+$ oc new-project vault-webhook
 
-$ git clone https://github.com/banzaicloud/bank-vaults.git
+$ git clone https://github.com/banzaicloud/bank-vaults.git -b v1.14.2 --single-branch
 
 $ cd bank-vaults/charts/vault-secrets-webhook
 
 
 $ helm3 upgrade --install banzai-vault-webhook . \
- -f scripts/webhook.vaules.openshift.yaml
+ -f scripts/webhook.values.openshift.yaml
 
 ----
 
-In case the runtime is OpenShift does the applications needs some security adjustments for the service account `banzai-vault-webhook-vault-secrets-webhook`
+.Commands to prepare the test namespace
+----
+$ oc new-project vault-test3
+$ oc label namespace vault-test3 webhookinjection=enabled
+namespace/vault-test3 labeled
+----
+
+
+In case the runtime is OpenShift consider the following security adjustments for the service account `banzai-vault-webhook-vault-secrets-webhook`:
 
 ----
 $ oc adm policy add-scc-to-user anyuid -z banzai-vault-webhook-vault-secrets-webhook
@@ -356,7 +397,7 @@ $ oc adm policy add-scc-to-user privileged -z banzai-vault-webhook-vault-secrets
 Check if the 2 pods are up and running
 
 ----
-$ oc get pods
+$ oc get pods -n vault-webhook
 NAME                                                          READY   STATUS    RESTARTS   AGE
 banzai-vault-webhook-vault-secrets-webhook-7d4d7bbdc5-jh5qz   1/1     Running   0          26s
 banzai-vault-webhook-vault-secrets-webhook-7d4d7bbdc5-w74rk   1/1     Running   0          26s
@@ -368,7 +409,7 @@ Now you have the webhook installed.
 
 Let's see the secret mutating webhook in action.
 
-Apply the link:examples/vault-webhook-base.yaml[] which deploys the same base application with the relevant annotations.
+Apply the link:examples/vault-webhook-base.yaml[] which deploys the same base application with the relevant annotations in the namespace `vault-test3`.
 
 [source,yaml]
 ----
@@ -384,7 +425,7 @@ Apply the link:examples/vault-webhook-base.yaml[] which deploys the same base ap
       containers:
       - name: showcase-vault
         image: busybox:1.28
-        command: ['sh', '-c', '/scripts/add.sh']
+        command: ['sh', '-c', '/scripts/secrets-output.sh']
         env:
         - name: DB_USERID
           value: vault:secret/data/dev/system-a#db_userid
@@ -397,10 +438,19 @@ The mutating webhook will handle this annotation, determine the secrets and hold
 Due the fact, that the base applications prints out the env variables on STDOUT is the value visible
 
 ----
-$ oc logs -f showcase-vault-deployment-854d8c6d48-8wq7h
+$ oc apply -f examples/vault-webhook-base.yaml -n vault-test3
+serviceaccount/sa-system-a-dev created
+serviceaccount/sa-system-b-dev created
+clusterrolebinding.rbac.authorization.k8s.io/sa-system-a-dev-test-vault-role-tokenreview-binding created
+secret/vault-demo-creds-01 created
+configmap/showcase-vault-scripts created
+deployment.apps/showcase-vault-deployment created
+
+
+$ oc logs -f -l app=showcase-vault --all-containers -n vault-test3
 time="2021-10-12T19:01:04Z" level=info msg="received new Vault token" addr= app=vault-env path=kubernetes role=role-system-a-dev
 time="2021-10-12T19:01:04Z" level=info msg="initial Vault token arrived" app=vault-env
-time="2021-10-12T19:01:04Z" level=info msg="spawning process: [sh -c /scripts/add.sh]" app=vault-env
+time="2021-10-12T19:01:04Z" level=info msg="spawning process: [sh -c /scripts/secrets-output.sh]" app=vault-env
 add.sh script
 [Main container] ...waiting...
 Env:

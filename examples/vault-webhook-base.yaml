@@ -11,15 +11,17 @@
 # - Using annotation to inject the secrets directly from Vault
 # - using service accounts to interact with Vault, service account is bound to a Vault role and policy
 ---
-piVersion: v1
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: sa-system-a-dev
+  namespace: vault-test3
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: sa-system-b-dev
+  namespace: vault-test3
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
@@ -32,12 +34,13 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: sa-system-a-dev
-    namespace: test-vault
+    namespace: vault-test3
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: vault-demo-creds-01
+  namespace: vault-test3
 stringData:
   username: dummy
   password: dummy-value 
@@ -46,9 +49,10 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: showcase-vault-scripts
+  namespace: vault-test3
 data:
-  add.sh: |
-    echo "add.sh script"
+  secrets-output.sh: |
+    echo "secrets-output.sh script"
     while [ true ]; do
       
       echo "$(date '+%Y-%m-%d %H:%M:%S'): [From Main container] ...waiting..." >> /logs/test.log; 
@@ -76,6 +80,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: showcase-vault-deployment
+  namespace: vault-test3
   labels:
     app: showcase-vault
 spec:
@@ -89,7 +94,7 @@ spec:
         app: showcase-vault
       annotations:        
         # the address of the Vault service, default values is https://vault:8200
-        vault.security.banzaicloud.io/vault-addr: "http://hashicorp-vault.test:8200"
+        vault.security.banzaicloud.io/vault-addr: "http://hashicorp-vault.vault-backend:8200"
         # the default value is the name of the ServiceAccount the Pod runs in, in case of Secrets and ConfigMaps it is "default"
         vault.security.banzaicloud.io/vault-role: "role-system-a-dev"
         vault.security.banzaicloud.io/vault-skip-verify: "true" 
@@ -100,7 +105,7 @@ spec:
       containers:
       - name: showcase-vault
         image: busybox:1.28
-        command: ['sh', '-c', '/scripts/add.sh']
+        command: ['sh', '-c', '/scripts/secrets-output.sh']
         env:
         - name: DB_USERID
           value: vault:secret/data/dev/system-a#db_userid

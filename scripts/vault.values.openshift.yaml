@@ -7,11 +7,11 @@ global:
 injector:
   image:
     repository: "registry.connect.redhat.com/hashicorp/vault-k8s"
-    tag: "0.13.1-ubi"
+    tag: "0.14.0-ubi"
 
   agentImage:
     repository: "registry.connect.redhat.com/hashicorp/vault"
-    tag: "1.8.3-ubi"
+    tag: "1.8.4-ubi"
 
   # Configures the log verbosity of the injector.
   # Supported log levels include: trace, debug, info, warn, error
@@ -21,10 +21,15 @@ injector:
   metrics:
     enabled: true
 
+  # Label for observing namespace
+  namespaceSelector:
+    matchLabels:
+      vaultinjection: enabled
+
 server:
   image:
     repository: "registry.connect.redhat.com/hashicorp/vault"
-    tag: "1.8.3-ubi"
+    tag: "1.8.4-ubi"
 
   # Configure the logging verbosity for the Vault server.
   # Supported log levels include: trace, debug, info, warn, error

@@ -25,8 +25,8 @@ kind: ConfigMap
 metadata:
   name: showcase-vault-scripts
 data:
-  add.sh: |
-    echo "add.sh script"
+  secrets-output.sh: |
+    echo "secrets-output.sh script"
     while [ true ]; do
       
       echo "$(date '+%Y-%m-%d %H:%M:%S'): [From Main container] ...waiting..." >> /logs/test.log; 
@@ -102,7 +102,7 @@ spec:
       containers:
       - name: showcase-vault
         image: busybox:1.28
-        command: ['sh', '-c', '/scripts/add.sh']
+        command: ['sh', '-c', '/scripts/secrets-output.sh']
         volumeMounts:
           # Mount for the logs, shared with sidecar
           - name: logs
