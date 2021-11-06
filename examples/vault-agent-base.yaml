@@ -64,9 +64,6 @@ spec:
         # Enable Vault Agent Injection
         vault.hashicorp.com/agent-inject: "true"        
         vault.hashicorp.com/agent-inject-status: "update"   
-        # The secrets will be mounted as volumes with path /vault/secrets/...     
-        #vault.hashicorp.com/agent-inject-secret-db-id: "system-a/dev/db_userid"        
-        #vault.hashicorp.com/agent-inject-secret-db-pw: "system-a/dev/db_password"        
         # Inject the Vault secret into a file '/vault/secrets/db.cfg'
         vault.hashicorp.com/agent-inject-secret-db.cfg: "secret/dev/system-a"   
         vault.hashicorp.com/agent-inject-template-db.cfg: |          

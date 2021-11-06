@@ -461,13 +461,43 @@ DB_USERID=SystemA.DB-User.Dev
 DB_PASSWORD=SystemA.DB-Password.Dev2
 ----
 
-But entering the container and trying to print out the env variables results only the in the meta information
+But entering the container and trying to print out the env variables results only in getting the meta information back
 
 ----
 oc exec -ti showcase-vault-deployment-854d8c6d48-8wq7h -- env | grep -i db
 DB_USERID=vault:secret/data/dev/system-a#db_userid
 DB_PASSWORD=vault:secret/data/dev/system-a#db_password
 ----
+
+The Banzai webhook supports also the mutating of `ConfigMap` and `Secret` objects. An example for the correct annotation follows
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-demo-webhook-secret
+  namespace: vault-test3
+  annotations:        
+    # the address of the Vault service, default values is https://vault:8200
+    vault.security.banzaicloud.io/vault-addr: "http://hashicorp-vault.vault-backend:8200"
+    # the default value is the name of the ServiceAccount the Pod runs in, in case of Secrets and ConfigMaps it is "default"
+    vault.security.banzaicloud.io/vault-role: "role-system-a-dev"
+    vault.security.banzaicloud.io/vault-serviceaccount: sa-system-a-dev
+    vault.security.banzaicloud.io/vault-skip-verify: "true" 
+stringData:
+  username: dummy
+  password: vault:secret/data/dev/system-a#db_password
+----
+
+Pay attention to set the correctly the `vault-role` and `vault-serviceaccount` otherwise the authorization would fail.
+After the successful creation contains the Secret the value from Vault
+
+----
+$ oc get secret vault-demo-webhook-secret -n vault-test3 -o jsonpath='{.data.password}' | base64 --decode
+SystemA.DB-Password.Dev
+----
+
 
 === Summary
 

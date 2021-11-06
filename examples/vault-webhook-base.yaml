@@ -76,6 +76,23 @@ data:
       sleep 15
     done;  
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-demo-webhook-secret
+  namespace: vault-test3
+  annotations:        
+    # the address of the Vault service, default values is https://vault:8200
+    vault.security.banzaicloud.io/vault-addr: "http://hashicorp-vault.vault-backend:8200"
+    # the default value is the name of the ServiceAccount the Pod runs in, in case of Secrets and ConfigMaps it is "default"
+    vault.security.banzaicloud.io/vault-role: "role-system-a-dev"
+    vault.security.banzaicloud.io/vault-skip-verify: "true" 
+    #vault.security.banzaicloud.io/vault-agent: "true"
+    vault.security.banzaicloud.io/vault-serviceaccount: sa-system-a-dev
+stringData:
+  username: dummy
+  password: vault:secret/data/dev/system-a#db_password
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
