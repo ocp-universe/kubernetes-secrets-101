@@ -31,10 +31,6 @@ data:
 
       echo "[Main container] ...waiting..."
       
-      #echo "Mounted:"
-      #echo "username=$(cat /secrets/showcase/username)"
-      #echo "password=$(cat /secrets/showcase/password)"
-
       echo "Env:"
       echo "...sourcing env-file (dev) with content from Vault..."
       source /vault/secrets/db-env      

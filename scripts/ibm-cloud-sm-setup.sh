@@ -40,9 +40,6 @@ else
 fi
 
 # Create Secret with API Key, URL and type
-kubectl -n default delete secret secret-api-key
-kubectl -n default create secret generic secret-api-key --from-literal=apikey=$IBM_CLOUD_API_KEY
-
 kubectl -n default delete secret ibmcloud-credentials
 kubectl -n default create secret generic ibmcloud-credentials --from-literal=apikey=$IBM_CLOUD_API_KEY \
 --from-literal=endpoint=$SECRETS_MANAGER_URL \

@@ -1,4 +1,6 @@
 # Base Deployment for HashiCorp Vault example with Banzai secret webhook
+# FAIL use case, wrong service-account
+#
 # Deploys the following containers
 # - init container: with a dummy echo statement
 # - base container: named "showcase", executes a script, stored in ConfigMap and appends some logs
@@ -35,6 +37,20 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: sa-system-a-dev
+    namespace: vault-test3
+---
+# Grant TokenReview permission to service account to allow verify of the token
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: sa-system-b-dev-test-vault-role-tokenreview-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: sa-system-b-dev
     namespace: vault-test3
 ---
 apiVersion: v1
@@ -110,7 +126,8 @@ spec:
         #vault.security.banzaicloud.io/vault-agent: "true"
     spec:
       # Specific sa, relevant for Vault interaction
-      serviceAccountName: sa-system-a-dev
+      # WRONG service-account
+      serviceAccountName: sa-system-b-dev
       containers:
       - name: showcase-vault
         image: busybox:1.28
