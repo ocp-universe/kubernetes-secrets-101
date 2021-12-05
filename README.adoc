@@ -84,7 +84,7 @@ After the installation of `kubernetes-external-secrets` are we ready to walk thr
 The `ExternalSecret` establish a reference to a secret in the Secrets Manager (via the UUID). This results into a created `Secret` with the same name (here: `externalsecret-demo-creds-01`)
 
 ----
-$ kubectl apply -f scripts/external-secret.yaml
+$ kubectl apply -f examples/external-secret.yaml
 
 $ kubectl get secret externalsecret-demo-creds-01 -o yaml | grep -A2 -e '^data'
 data:
