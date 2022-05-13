@@ -127,6 +127,13 @@ spec:
           # Mount from ConfigMap holding a script
           - name: showcase-scripts-configmap
             mountPath: /scripts
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "64Mi"
+            cpu: "250m"
       volumes:
         - name: logs
           emptyDir: {}
