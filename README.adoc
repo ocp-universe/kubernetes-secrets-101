@@ -159,7 +159,7 @@ $ cd vault-helm
 
 $ oc new-project vault-backend
 
-$ helm3 upgrade --install hashicorp-vault . \
+$ helm upgrade --install hashicorp-vault . \
  --set "global.openshift=true" \
  --set "server.dev.enabled=true" \
  --set "server.logLevel=trace" \
@@ -367,17 +367,20 @@ see the previous section how to install HashiCorp Vault.
 
 The installation use a link:https://github.com/banzaicloud/bank-vaults/tree/master/charts/vault-secrets-webhook[Helm Chart] and explained in the link:https://banzaicloud.com/docs/bank-vaults/mutating-webhook/deploy/[deployment page]. The main steps are summarized here
 
+WARNING: Since version 1.15.x runs the initContainer as root, which is in secured Kubernetes clusters, like OpenShift, a no-go. No fix currently in place, see link:https://github.com/banzaicloud/bank-vaults/issues/1593[issue].
+
 .Commands to install the webhook
 ----
 $ oc new-project vault-webhook
 
 $ git clone https://github.com/banzaicloud/bank-vaults.git -b v1.14.2 --single-branch
+$ git clone https://github.com/banzaicloud/bank-vaults.git -b v1.15.3 --single-branch
 
 $ cd bank-vaults/charts/vault-secrets-webhook
 
 
 $ helm3 upgrade --install banzai-vault-webhook . \
- -f scripts/webhook.values.openshift.yaml
+ -f ../../../../scripts/webhook.values.openshift.yaml
 
 ----
 
@@ -392,7 +395,6 @@ namespace/vault-test3 labeled
 In case the runtime is OpenShift consider the following security adjustments for the service account `banzai-vault-webhook-vault-secrets-webhook`:
 
 ----
-$ oc adm policy add-scc-to-user anyuid -z banzai-vault-webhook-vault-secrets-webhook
 $ oc adm policy add-scc-to-user privileged -z banzai-vault-webhook-vault-secrets-webhook
 ----
 

@@ -26,7 +26,7 @@ metadata:
   namespace: vault-test3
 ---
 # Grant TokenReview permission to service account to allow verify of the token
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: sa-system-a-dev-test-vault-role-tokenreview-binding
@@ -40,7 +40,7 @@ subjects:
     namespace: vault-test3
 ---
 # Grant TokenReview permission to service account to allow verify of the token
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: sa-system-b-dev-test-vault-role-tokenreview-binding

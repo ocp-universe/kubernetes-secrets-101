@@ -24,7 +24,7 @@ metadata:
   namespace: vault-test3
 ---
 # Grant TokenReview permission to service account to allow verify of the token
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: sa-system-a-dev-test-vault-role-tokenreview-binding
@@ -49,7 +49,7 @@ stringData:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: showcase-vault-scripts
+  name: showcase-vault-webhook-scripts
   namespace: vault-test3
 data:
   secrets-output.sh: |
@@ -88,19 +88,19 @@ stringData:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: showcase-vault-deployment
+  name: showcase-vault-webhook-deployment
   namespace: vault-test3
   labels:
-    app: showcase-vault
+    app: showcase-vault-webhook
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: showcase-vault
+      app: showcase-vault-webhook
   template:
     metadata:
       labels:
-        app: showcase-vault
+        app: showcase-vault-webhook
       annotations:        
         # the address of the Vault service, default values is https://vault:8200
         vault.security.banzaicloud.io/vault-addr: "http://hashicorp-vault.vault-backend:8200"
@@ -112,7 +112,7 @@ spec:
       # Specific sa, relevant for Vault interaction
       serviceAccountName: sa-system-a-dev
       containers:
-      - name: showcase-vault
+      - name: showcase-vault-webhook
         image: busybox:1.28
         command: ['sh', '-c', '/scripts/secrets-output.sh']
         env:
@@ -139,6 +139,6 @@ spec:
           emptyDir: {}
         - name: showcase-scripts-configmap
           configMap:
-            name: showcase-vault-scripts
+            name: showcase-vault-webhook-scripts
             defaultMode: 0777
         
