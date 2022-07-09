@@ -21,13 +21,15 @@ Depending how the `Secret` object is used is an update of the Secret data not vi
 
 TIP: Consider always to use a Kubernetes cluster with encrypted etcd and restrict the access to the cluster and namespaces with RBAC!
 
-== IBM Cloud Secrets Manager & kubernetes-external-secrets
+== IBM Cloud Secrets Manager & external-secrets
+
+NOTE: link:https://github.com/external-secrets/kubernetes-external-secrets[`kubernetes-external-secret`] is deprecated and the recommendation is to use link:https://github.com/external-secrets/external-secrets[`external-secret`]. This article reflects this change.
 
 link:https://cloud.ibm.com/docs/secrets-manager[IBM Cloud Secrets Manager] built on top of the open source HashiCorp Vault solution and provides a managed offering to maintain centralized secrets, secured and protected.
 
-Due the fact, that internally HashiCorp Vault is integrated, most of the existing plugins/agents could use. The simplest way is to use the Vault cli to interact with IBM Cloud Secrets Manager. In this option however the existing https://github.com/external-secrets/kubernetes-external-secrets[kubernetes-external-secrets] plugin will be used to interact with the service.
+Due the fact, that internally HashiCorp Vault is integrated, most of the existing plugins/agents could use. The simplest way is to use the Vault cli to interact with IBM Cloud Secrets Manager. In this option however the existing https://github.com/external-secrets/external-secrets[external-secrets] plugin will be used to interact with the service.
 With the CRD `ExternalSecret` a relation to a stored secret in IBM Cloud Secrets Manager instance is established. The result is a generated Kubernetes `Secret` with the sensitive data.
-In addition `kubernetes-external-secrets` observe the registered secret and updates the `Secret` if any changes occur.
+In addition `external-secrets` observe the registered secret and updates the `Secret` if any changes occur.
 
 The scenario show cases the following
 
@@ -37,19 +39,19 @@ The scenario show cases the following
 * updating the secret in the Secrets Manager
 * will trigger automatically an update of the `Secret` object
 
-Beforehand a short summary how to install and configure `kubernetes-external-secrets` with IBM Cloud Secrets Manager. For details consult the link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-tutorial-kubernetes-secrets[docu].
+Beforehand a short summary how to install and configure `external-secrets` with IBM Cloud Secrets Manager. For details consult the link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-tutorial-kubernetes-secrets[docu].
 
 .Tasks to install and configure
 * Create a service ID
 * ...assign permmissions to the new service ID to interact with the Secrets Manager instance
 * ...create an API Key for the service ID
-* Prepare Kubernetes-External-Secrets installation
+* Prepare external-secrets installation
 ** get the user-specific Secrets Manager instance endpoint
 ** create a link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-secret-groups[secret group] (here `sg-demo`) and probably also some secrets
 ** create Kubernetes `Secret` with the generated API Key
-** Install Kubernetes-External-Secrets via Helm3 and setting correct parameters
+** Install external-secrets via Operator and setting correct parameters
 
-Execute the script link:scripts/ibm-cloud-sm-setup.sh[] or check the following listing to prepare and setup `kubernetes-external-secrets`.
+Execute the script link:scripts/ibm-cloud-sm-setup.sh[] or check the following listing to prepare and setup `external-secrets`.
 
 .Summary of the commands
 [%collapsible]
@@ -79,7 +81,7 @@ $ helm3 install kubernetes-external-secrets external-secrets/kubernetes-external
 ----
 ====
 
-After the installation of `kubernetes-external-secrets` are we ready to walk through the scenario.
+After the installation of `external-secrets` are we ready to walk through the scenario.
 
 The `ExternalSecret` establish a reference to a secret in the Secrets Manager (via the UUID). This results into a created `Secret` with the same name (here: `externalsecret-demo-creds-01`)
 
@@ -119,11 +121,11 @@ SHOWCASE_USERNAME=dummy
 -------------------------------------------
 ----
 
-As visible in the output, the values in the env variables are still the old one, while the values have changed. As it can be seen for the mounted variables.
+As visible in the output, the latest secret values are only reflected in the variables from the mounted volumes and not in the env variables.
 
 === Summary
 
-With IBM Cloud Secrets Manager exists an offering base on HashiCorp Vault. The `kubernetes-external-secrets` extension allows a very simple integration in Kubernetes. Also updates will be automatically applied. The extensions supports various providers and configuration parameters.
+With IBM Cloud Secrets Manager exists an offering base on HashiCorp Vault. The `external-secrets` extension allows a very simple integration in Kubernetes. Also updates will be automatically applied. The extensions supports various providers and configuration parameters.
 
 The drawback - from the security perspective - are
 
@@ -134,7 +136,8 @@ The drawback - from the security perspective - are
 
 * link:https://cloud.ibm.com/docs/secrets-manager?topic=secrets-manager-tutorial-kubernetes-secrets[IBM Cloud Secrets Manager - Kubernetes integration]
 * link:https://learn.hashicorp.com/tutorials/vault/kubernetes-external-vault?in=vault/kubernetes[Vault install - external vault, agent in cluster]
-* link:https://github.com/external-secrets/kubernetes-external-secrets[GitHub: kubernetes-external-secrets]
+* link:https://github.com/external-secrets/external-secrets[GitHub: external-secrets]
+* Deprecated: link:https://github.com/external-secrets/kubernetes-external-secrets[GitHub: kubernetes-external-secrets]
 
 == HashiCorp Vault & Vault agent
 
@@ -150,6 +153,7 @@ Briefly an overview of the main steps for the installation and configuration. Al
 
 ----
 $ git clone https://github.com/hashicorp/vault-helm -b v0.17.1 --single-branch
+$ git clone https://github.com/hashicorp/vault-helm -b v0.19.0 --single-branch
 
 $ cd vault-helm
 
@@ -210,6 +214,8 @@ image:static/vault.png[]
 === HashiCorp Vault Agent Sidecar
 
 By default the link:https://www.vaultproject.io/docs/platform/k8s/injector[Vault Agent injector] will be also installed, otherwise use the link:https://www.vaultproject.io/docs/platform/k8s/injector/installation[docu]. Vault Agent injector retrieves secrets from Vault and stores them on a shared volume as file using a custom or default template.
+
+The Agent observes all the namespace label currently with `vaultinjection=enabled` - defined during the installation.
 
 To enable the communication between the agent and Vault instance is it necessary to configure the auth method, like https://www.vaultproject.io/docs/auth/kubernetes#configuration[Kubernetes Auth method]
 
@@ -508,7 +514,25 @@ Also the capabilities to inject secrets into `ConfigMap` and `Secret` are advant
 * link:https://github.com/banzaicloud/bank-vaults/tree/master/charts/vault-secrets-webhook[Helm Chart of webhook]
 
 
-== Summmary
+== SealedSecret
+
+----
+$ echo -n bar | kubectl create secret generic mysecret --dry-run=client --from-file=foo=/dev/stdin -o json > mysecret.json
+
+$ kubeseal --controller-name sealed-secret-controller-sealed-secrets --controller-namespace sealed-secrets < mysecret.json > mysealedsecret.json
+
+
+$ kubeseal --fetch-cert --controller-name sealed-secret-controller-sealed-secrets --controller-namespace sealed-secrets
+
+$ oc apply -f mysealedsecret.json
+
+$ oc get SealedSecret -o yaml
+
+$ oc get secret mysecret -o yaml
+----
+
+
+== Summary
 
 Secrets and their handling is a serious topics in any cloud environment. Luckily various solutions options exists to integrate managed secrets into applications running in a Kubernetes environment. Not all here shown options fulfill all requirements and use cases. Thereby the appropriate option must be used for the own context and solution. Below is a comparison of the most important features.
 

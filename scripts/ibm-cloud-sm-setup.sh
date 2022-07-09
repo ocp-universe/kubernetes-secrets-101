@@ -21,7 +21,7 @@ export IBM_CLOUD_API_KEY=`ibmcloud iam service-api-key-create kubernetes-secrets
 
 # Prepare Secrets Manager with secret group and dummy secret
 echo "SecretsManagerUrl..."
-export SECRETS_MANAGER_URL=`ibmcloud resource service-instance secrets-manager --output json | jq -r '.[].dashboard_url | .[0:-3]'`; echo "SecretsManagerUrl: $SECRETS_MANAGER_URL"
+export SECRETS_MANAGER_URL=`ibmcloud resource service-instance poc-devsecops-secretsmanager --output json | jq -r '.[].dashboard_url | .[0:-3]'`; echo "SecretsManagerUrl: $SECRETS_MANAGER_URL"
 
 echo "SecretGroup..."
 export SECRET_GROUP_ID=`ibmcloud secrets-manager secret-groups --output json | jq '.resources[] | select(.name=="sg-demo") | .id'`
@@ -38,6 +38,11 @@ if [ -z "${SECRET_ID}" ]; then
 else 
     echo "...found: SecretId: $SECRET_ID"
 fi
+
+echo $SECRETS_MANAGER_URL
+echo $IBM_CLOUD_API_KEY
+
+exit 0;
 
 # Create Secret with API Key, URL and type
 kubectl -n default delete secret ibmcloud-credentials
